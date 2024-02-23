@@ -1,0 +1,67 @@
+services:
+  elasticsearch:
+    image: elasticsearch:8.12.1
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+      - esdata:/usr/share/elasticsearch/data
+      - ./elastic/config:/usr/share/elasticsearch/config
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    networks:
+      - elastic
+  logstash:
+    image: logstash:8.12.1
+    container_name: logstash
+    environment:
+      discovery.seed_hosts: elasticsearch
+      LS_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - logstashdata:/usr/share/logstash/data
+      - ./logstash/config:/usr/share/logstash/config
+      - ./logstash/logstash.config:/usr/share/logstash/pipeline/logstash.config
+    ports:
+      - "5000:5000/tcp"
+      - "5000:5000/udp"
+      - "5044:5044"
+      - "9600:9600"
+    depends_on:
+      - elasticsearch
+    networks:
+      - elastic
+    command: logstash -f /usr/share/logstash/pipeline/
+  kibana:
+    image: kibana:8.12.1
+    container_name: kibana
+    volumes:
+      - kibanadata:/usr/share/kibana/data
+      - certs:/usr/share/kibana/config/certs
+      - ./kibana/config:/usr/share/kibana/config
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - elastic
+networks:
+  elastic:
+    driver: bridge
+volumes:
+  esdata:
+    driver: local
+  logstashdata:
+    driver: local
+  kibanadata:
+    driver: local
+  certs:
+    driver: local
+
